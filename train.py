@@ -5,7 +5,7 @@ from sklearn.model_selection import train_test_split
 from data_loader import class_names, train_images
 from data_generator import create_dataset
 from model import create_car_classifier
-
+from tensorflow.keras import mixed_precision
 
 def setup_gpu():
     """Configure GPU settings"""
@@ -22,7 +22,7 @@ def setup_gpu():
             print(f"⚠️ GPU setup error: {e}")
     else:
         print("❌ No GPU found - using CPU")
-
+    mixed_precision.set_global_policy('mixed_float16')
     # Use the non-deprecated way to check GPU
     print(f"TensorFlow built with CUDA: {tf.test.is_built_with_cuda()}")
 
@@ -44,16 +44,21 @@ def main():
     train_ds = create_dataset(
         train_split,
         'stanford-cars-dataset/versions/1/cars_train/cars_train',
-        batch_size=64,
+        batch_size=192,
         shuffle=True
     )
 
     val_ds = create_dataset(
         val_split,
         'stanford-cars-dataset/versions/1/cars_train/cars_train',
-        batch_size=64,
+        batch_size=192,
         shuffle=False
     )
+
+    callbacks = [
+        tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True),
+        tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.3, patience=2)
+    ]
 
     # Create and compile model
     print("Creating model...")
@@ -70,9 +75,8 @@ def main():
         train_ds,
         validation_data=val_ds,
         epochs=10,
-        callbacks=[
-            tf.keras.callbacks.EarlyStopping(patience=3, restore_best_weights=True)
-        ]
+        workers=8,
+        callbacks=callbacks
     )
 
     # Save

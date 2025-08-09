@@ -15,7 +15,7 @@ def create_car_classifier(num_classes=196):
     inputs = tf.keras.Input(shape=(224, 224, 3))
     x = base_model(inputs, training=False)
     x = layers.GlobalAveragePooling2D()(x)
-    x = layers.Dropout(0.2)(x)
+    x = layers.Dropout(0.5)(x)
     outputs = layers.Dense(num_classes, activation='softmax')(x)
 
     model = Model(inputs, outputs)
