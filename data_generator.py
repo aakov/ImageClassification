@@ -1,47 +1,48 @@
 import tensorflow as tf
-import numpy as np
-from PIL import Image
 import os
 from tensorflow.keras.applications.resnet50 import preprocess_input
 
+def preprocess_image_tf(image_bytes, bbox):
+    # Decode JPEG
+    image = tf.image.decode_jpeg(image_bytes, channels=3)
 
-def preprocess_image(image_path, bbox):
-    image = Image.open(image_path).convert('RGB')
-    x1, y1, x2, y2 = bbox
-    if np.random.rand() < 0.5:
-        image = image.transpose(Image.FLIP_LEFT_RIGHT)
+    # Crop to bounding box
+    x1, y1, x2, y2 = tf.unstack(tf.cast(bbox, tf.int32))
+    image = tf.image.crop_to_bounding_box(image, y1, x1, y2 - y1, x2 - x1)
 
-    # Random brightness
-    if np.random.rand() < 0.5:
-        factor = 1.0 + (np.random.rand() - 0.5) * 0.4  # ±20% brightness
-        image = Image.fromarray(np.clip(np.array(image) * factor, 0, 255).astype(np.uint8))
-    image = image.crop((x1, y1, x2, y2))
-    image = image.resize((224, 224))
-    image = np.array(image, dtype=np.float32)
-    image = preprocess_input(image)  # Use ResNet50 preprocessing
-    # Random horizontal flip
+    # Resize
+    image = tf.image.resize(image, [224, 224])
+
+    # Data augmentation
+    image = tf.image.random_flip_left_right(image)
+    image = tf.image.random_brightness(image, max_delta=0.2)
+
+    # ResNet50 preprocessing
+    image = preprocess_input(image)
 
     return image
 
-
 def create_dataset(car_images, images_dir, batch_size, shuffle=True):
-    def generator():
-        indices = list(range(len(car_images)))
-        if shuffle:
-            np.random.shuffle(indices)
+    # Prepare file paths & labels as tensors
+    filepaths = [os.path.join(images_dir, ci.filename) for ci in car_images]
+    bboxes = [ci.bbox for ci in car_images]
+    labels = [ci.label for ci in car_images]
 
-        for i in indices:
-            car_image = car_images[i]
-            image_path = os.path.join(images_dir, car_image.filename)
-            image = preprocess_image(image_path, car_image.bbox)
-            yield image, car_image.label
+    ds = tf.data.Dataset.from_tensor_slices((filepaths, bboxes, labels))
 
-    dataset = tf.data.Dataset.from_generator(
-        generator,
-        output_signature=(
-            tf.TensorSpec(shape=(224, 224, 3), dtype=tf.float32),
-            tf.TensorSpec(shape=(), dtype=tf.int32)
-        )
-    )
+    if shuffle:
+        ds = ds.shuffle(buffer_size=batch_size * 10)
 
-    return dataset.batch(batch_size).prefetch(tf.data.AUTOTUNE)
+    # Load & preprocess
+    def load_and_preprocess(path, bbox, label):
+        image_bytes = tf.io.read_file(path)
+        image = preprocess_image_tf(image_bytes, bbox)
+        return image, label
+
+    ds = ds.map(load_and_preprocess, num_parallel_calls=tf.data.AUTOTUNE)
+
+    # Batch & prefetch
+    ds = ds.batch(batch_size, drop_remainder=False)
+    ds = ds.prefetch(tf.data.AUTOTUNE)
+
+    return ds

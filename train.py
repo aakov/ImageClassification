@@ -44,14 +44,14 @@ def main():
     train_ds = create_dataset(
         train_split,
         'stanford-cars-dataset/versions/1/cars_train/cars_train',
-        batch_size=192,
+        batch_size=128,
         shuffle=True
     )
 
     val_ds = create_dataset(
         val_split,
         'stanford-cars-dataset/versions/1/cars_train/cars_train',
-        batch_size=192,
+        batch_size=128,
         shuffle=False
     )
 
@@ -73,10 +73,12 @@ def main():
     print("Starting training...")
     history = model.fit(
         train_ds,
+        batch_size=128,
         validation_data=val_ds,
-        epochs=10,
-        workers=8,
-        callbacks=callbacks
+        epochs=15,
+        callbacks=callbacks,
+        use_multiprocessing=True
+
     )
 
     # Save
