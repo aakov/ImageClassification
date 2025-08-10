@@ -57,7 +57,7 @@ def main():
 
     callbacks = [
         tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True),
-        tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.3, patience=2)
+        tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=2, min_lr=1e-6)
     ]
 
     # Create and compile model
@@ -73,9 +73,9 @@ def main():
     print("Starting training...")
     history = model.fit(
         train_ds,
-        batch_size=128,
+        batch_size=256,
         validation_data=val_ds,
-        epochs=15,
+        epochs=40,
         callbacks=callbacks,
         use_multiprocessing=True
 
