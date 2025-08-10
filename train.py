@@ -44,27 +44,27 @@ def main():
     train_ds = create_dataset(
         train_split,
         'stanford-cars-dataset/versions/1/cars_train/cars_train',
-        batch_size=128,
+        batch_size=64,
         shuffle=True
     )
 
     val_ds = create_dataset(
         val_split,
         'stanford-cars-dataset/versions/1/cars_train/cars_train',
-        batch_size=128,
+        batch_size=64,
         shuffle=False
     )
 
     callbacks = [
         tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True),
-        tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=2, min_lr=1e-6)
+        tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.3, patience=2, min_lr=1e-6)
     ]
 
     # Create and compile model
     print("Creating model...")
     model = create_car_classifier(num_classes=len(class_names))
     model.compile(
-        optimizer='adam',
+        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
         loss='sparse_categorical_crossentropy',
         metrics=['accuracy']
     )
@@ -73,17 +73,35 @@ def main():
     print("Starting training...")
     history = model.fit(
         train_ds,
-        batch_size=256,
+        batch_size=64,
         validation_data=val_ds,
-        epochs=40,
+        epochs=15,
         callbacks=callbacks,
         use_multiprocessing=True
-
     )
 
     # Save
     os.makedirs('outputs', exist_ok=True)
     model.save('outputs/car_model.keras')
+    model.trainable = True
+    for layer in model.layers[:-30]:  # freeze all but last ~30 layers
+        layer.trainable = False
+
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-5),
+        loss='sparse_categorical_crossentropy',
+        metrics=['accuracy']
+    )
+    # Train
+    print("Starting training again...")
+    history = model.fit(
+        train_ds,
+        batch_size=64,
+        validation_data=val_ds,
+        epochs=15,
+        callbacks=callbacks,
+        use_multiprocessing=True
+    )
 
     print(f"✅ Final accuracy: {history.history['val_accuracy'][-1]:.4f}")
 
