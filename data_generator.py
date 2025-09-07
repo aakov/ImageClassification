@@ -3,14 +3,17 @@ import os
 from tensorflow.keras.applications.resnet50 import preprocess_input
 
 def preprocess_image_tf(image_bytes, bbox):
-
+    # Decode JPEG
     image = tf.image.decode_jpeg(image_bytes, channels=3)
 
     # Crop to bounding box
     x1, y1, x2, y2 = tf.unstack(tf.cast(bbox, tf.int32))
     image = tf.image.crop_to_bounding_box(image, y1, x1, y2 - y1, x2 - x1)
 
+    # Resize
     image = tf.image.resize(image, [224, 224])
+
+    # Data augmentation
     image = tf.image.random_flip_left_right(image)
     image = tf.image.random_brightness(image, max_delta=0.2)
 
@@ -20,7 +23,7 @@ def preprocess_image_tf(image_bytes, bbox):
     return image
 
 def create_dataset(car_images, images_dir, batch_size, shuffle=True):
-    # Make them tensors
+    # Prepare file paths & labels as tensors
     filepaths = [os.path.join(images_dir, ci.filename) for ci in car_images]
     bboxes = [ci.bbox for ci in car_images]
     labels = [ci.label for ci in car_images]

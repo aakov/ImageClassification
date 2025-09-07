@@ -23,6 +23,7 @@ def setup_gpu():
     else:
         print("❌ No GPU found - using CPU")
     mixed_precision.set_global_policy('mixed_float16')
+    # Use the non-deprecated way to check GPU
     print(f"TensorFlow built with CUDA: {tf.test.is_built_with_cuda()}")
 
 
